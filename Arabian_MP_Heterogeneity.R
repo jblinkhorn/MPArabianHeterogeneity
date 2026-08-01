@@ -3,10 +3,15 @@ library(ggplot2)
 library(ggpubr)
 library(GGally)
 library(ROCR)
+library(dplyr)
+library(viridis)
+
+script_path <- rstudioapi::getSourceEditorContext()$path
+setwd(dirname(script_path))
 
 ####load the data and prep####
 
-levallois_data = read.csv("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/Levallois_flake_data_2025_02_12.csv") #jb
+levallois_data = read.csv("Levallois_flake_data_submission.csv") #jb
 levallois_data$SpCode = 0 
 levallois_data[which(levallois_data$Site == "Tor Faraj"),"SpCode"] <- 1 #Neanderthal
 levallois_data[which(levallois_data$Site == "Kebara X"),"SpCode"] <- 1 #Neanderthal
@@ -22,11 +27,11 @@ levallois_nona = levallois_data[-which(apply(levallois_data, 1, function(x)any(i
 var_cols = 3:10 #set var_cols for PCA as raw measurements
 colnames(levallois_nona)[which(names(levallois_nona) == "DorsalSA_TwoTrapezoids")] <- "FlakeArea" #
 
-# Reorder 'Site' based on 'Region' for plotting
-levallois_nona$Site <- factor(levallois_nona$Site, levels = unique(levallois_nona$Site[order(levallois_nona$Region)]))
+
+levallois_nona$Site <- factor(levallois_nona$Site, levels = unique(levallois_nona$Site[order(levallois_nona$Region)])) # Reorder 'Site' based on 'Region' for plotting
 
 ####Figure 3 ####
-# Updated ggplot code
+
 Elong <- ggplot(data = levallois_nona, mapping = aes(Site, Elongation, group = Site)) +
   geom_jitter(width = 0.15, height = 0, alpha = 0.5, size = 0.5) +
   geom_boxplot(aes(colour = Region, fill = Region), alpha = 0.8, outlier.shape = NA) +
@@ -63,10 +68,6 @@ Flake <- ggplot(data = levallois_nona, mapping = aes(Site, FlakeArea, group = Si
         axis.text.x = element_text(size = 12, angle = 45, vjust = 0.5),
         axis.title.x = element_blank())
 
-# Load necessary packages
-library(ggplot2)
-library(dplyr)
-
 # Calculate percentages within each Site
 dorsal_summary <- levallois_nona %>%
   group_by(Region, Site, Dorsal.scar.pattern) %>%
@@ -76,8 +77,8 @@ dorsal_summary <- levallois_nona %>%
 # Combine Region and Site into a single ordered factor
 dorsal_summary$Region_Site <- factor(paste(dorsal_summary$Region, dorsal_summary$Site, sep = " - "),
                                      levels = unique(paste(dorsal_summary$Region, dorsal_summary$Site, sep = " - ")))
-library(viridis)
-# Create bar chart with properly spaced and ordered sites
+
+# Create bar chart
 Scar <- ggplot(dorsal_summary, aes(x = Region_Site, y = percentage, fill = Dorsal.scar.pattern)) +
   geom_bar(stat = "identity", position = "fill") +  # Ensures each bar totals 100%
   scale_fill_viridis(discrete = TRUE) +
@@ -98,8 +99,8 @@ rawmat_summary <- levallois_nona %>%
 # Combine Region and Site into a single ordered factor
 rawmat_summary$Region_Site <- factor(paste(rawmat_summary$Region, rawmat_summary$Site, sep = " - "),
                                      levels = unique(paste(rawmat_summary$Region, rawmat_summary$Site, sep = " - ")))
-library(viridis)
-# Create bar chart with properly spaced and ordered sites
+
+# Create bar chart 
 RawMat <- ggplot(rawmat_summary, aes(x = Region_Site, y = percentage, fill = raw_mat_simplified)) +
   geom_bar(stat = "identity", position = "fill") +  # Ensures each bar totals 100%
   scale_fill_viridis(discrete = TRUE, option="turbo") +
@@ -112,8 +113,6 @@ RawMat <- ggplot(rawmat_summary, aes(x = Region_Site, y = percentage, fill = raw
         axis.title.x = element_blank()) +
   labs(y = "Raw Material %", fill = "Raw Material")
 
-
-library(ggplot2)
 library(cowplot)
 library(gridExtra)
 
@@ -137,13 +136,9 @@ Conv <- Conv + theme(legend.position = "none", axis.text.x = element_blank())
 RawMat <- RawMat + theme(legend.position = "none")
 Scar <- Scar + theme(legend.position = "none")
 
-# Arrange main plots in a grid
-main_plots <- plot_grid(Flake, Platform, Elong, Conv, RawMat, Scar, ncol = 2, align="v")
-
+main_plots <- plot_grid(Flake, Platform, Elong, Conv, RawMat, Scar, ncol = 2, align="v") # Arrange main plots in a grid
 legend_right <- plot_grid(NULL, legend_Flake, ncol = 2, rel_widths = c(0, 0.3))
-
 legend_bottom <- plot_grid(legend_RawMat, legend_Scar, NULL, ncol = 3, rel_widths = c(0.4, 0.4, 0.1))  # Centers the Flake legend
-
 
 # First, arrange the main plots with the right-hand legends
 main_right <- plot_grid(
@@ -157,22 +152,17 @@ final_plot <- plot_grid(
   main_right,
   legend_bottom,
   ncol = 1,
-  rel_heights = c(1, 0.1)  # Prevents right-hand legends from overlapping below
+  rel_heights = c(1, 0.1)  # Prevents right-hand legends from overlapping
 )
 
-# Display final combined plot
 final_plot
-
-ggsave("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/final_plot.pdf", plot = final_plot, width = 12, height = 12, units = "in")
-
-ggsave("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/final_plot.jpg", plot = final_plot, width = 12, height = 12, units = "in")
-
+ggsave("Figure 3.pdf", plot = final_plot, width = 12, height = 12, units = "in")
+ggsave("Figure 3.jpg", plot = final_plot, width = 12, height = 12, units = "in")
 
 ####PCA analysis####
 
 ## pre pca
 KMO(levallois_nona[,var_cols])
-
 cortest.bartlett(cor(levallois_nona[,var_cols]), n=nrow(levallois_nona[,var_cols]))
 
 ## separate out training data
@@ -228,6 +218,99 @@ levallois_proj$Site <- factor(levallois_proj$Site,
                               levels = unique(levallois_proj$Site[order(levallois_proj$Region, levallois_proj$Site)]))
 
 ####Figure 4####
+
+library(tidyverse)
+
+loadings <- as.data.frame(pca_levallois_train$rotation)
+loadings$Variable <- rownames(loadings)
+
+load_long <- loadings %>%
+  pivot_longer(
+    cols = starts_with("PC"),
+    names_to = "PC",
+    values_to = "Loading"
+  ) %>%
+  mutate(Direction = ifelse(Loading >= 0, "Positive", "Negative"))
+
+# Rename variables
+load_long$Variable <- recode(load_long$Variable,
+                             "N_scars"              = "Number of Scars",
+                             "Length"               = "Length",
+                             "Proximal_width"       = "Proximal Width",
+                             "Medial_width"         = "Medial Width",
+                             "Distal_width"         = "Distal Width",
+                             "Thickness_at_medial"  = "Thickness at Medial",
+                             "Platform_width"       = "Platform Width",
+                             "Platform_thickness"   = "Platform Thickness"
+)
+
+# Order variables
+var_order <- c(
+  "Distal Width",
+  "Length",
+  "Medial Width",
+  "Number of Scars",
+  "Platform Thickness",
+  "Platform Width",
+  "Proximal Width",
+  "Thickness at Medial"
+)
+
+load_long$Variable <- factor(load_long$Variable, levels = var_order)
+
+max_load <- max(abs(load_long$Loading))
+
+# Colours
+col_pos <- "#377eb8"
+col_neg <- "#d87a7a"   # red   # example pale red — swap for any you like
+
+p1 <- ggplot(load_long, aes(x = Variable, y = Loading, fill = Direction)) +
+  geom_hline(yintercept = 0, colour = "grey30", linewidth = 0.6) +   # darker zero line
+  geom_col(width = 0.85) +
+  scale_fill_manual(values = c("Positive" = col_pos, "Negative" = col_neg)) +
+  facet_wrap(~ PC, ncol = 1, strip.position = "right") +
+  coord_cartesian(ylim = c(-max_load, max_load)) +
+  theme_bw(base_size = 11) +
+  theme(
+    # Strip styling: centred on zero line
+    strip.background = element_blank(),
+    strip.text = element_text(size = 11, face = "bold", hjust = 0.5, vjust = 0.5),
+    
+    # Increase strip width so label visually centres on zero line
+    strip.placement = "outside",
+    strip.text.y.right = element_text(angle = 0),
+    
+    # Panel spacing
+    panel.spacing = unit(-0.6, "lines"),
+    
+    # Remove panel borders
+    panel.border = element_blank(),
+    
+    # Clean grid
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.title.x = element_text(size = 11),
+    axis.title.y = element_text(size = 11),
+    
+    legend.position = "right",
+    legend.title = element_text(size = 11),
+    legend.text = element_text(size = 10)
+  ) +
+  labs(
+    x = "Vars",
+    y = "Loading",
+    fill = "Direction"
+  )
+
+
+p1
+
+ggsave("Figure4.pdf", plot = p1, width = 8, height = 8, units = "in")
+ggsave("Figure4.jpg", plot = p1, width = 8, height = 8, units = "in")
+
+####Figure 5####
 
 p1 <- ggplot(data = levallois_proj, 
              mapping = aes(Site, PC1, group = Site)) +
@@ -291,8 +374,8 @@ final_plot <- plot_grid(plots_grid, legend, ncol = 1, rel_heights = c(1, 0.1))
 
 final_plot
 
-ggsave("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/final_plot2.pdf", plot = final_plot, width = 8, height = 12, units = "in")
-ggsave("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/final_plot2.jpg", plot = final_plot, width = 8, height = 12, units = "in")
+ggsave("Figure 5.pdf", plot = final_plot, width = 8, height = 12, units = "in")
+ggsave("Figure 5.jpg", plot = final_plot, width = 8, height = 12, units = "in")
 
 ####Figure 8 ####
 
@@ -380,59 +463,15 @@ p6a <- ggplot() +
 
 library(patchwork)
 
-(p5 + p6) / (p5a + p6a)
+final_plot <- (p5 + p6) / (p5a + p6a)
 
-#need to add a line to save this
+final_plot
 
-#####UPDATED OLD FIGURE of JKF1 and ALM3 ON PC2 and PC£3####
+ggsave("Figure 8.jpg", plot = final_plot, width = 12, height = 12, units = "in")
 
-
-#JKF1_hull_index <- chull(subset(levallois_proj,Site=="JKF-1")[,c("PC3","PC2")])
-#JKF1_hull_coords <- subset(levallois_proj,Site=="JKF-1")[JKF1_hull_index,c("PC3","PC2")]
-#JKF1_hull_centroid <- colMeans(JKF1_hull_coords)
-#JKF1_hull_centroid <- data.frame(PC3=JKF1_hull_centroid[1],PC2=JKF1_hull_centroid[2])
-
-#ALM3_hull_index <- chull(subset(levallois_proj,Site=="ALM-3")[,c("PC3","PC2")])
-#ALM3_hull_coords <- subset(levallois_proj,Site=="ALM-3")[ALM3_hull_index,c("PC3","PC2")]
-#ALM3_hull_centroid <- colMeans(ALM3_hull_coords)
-#ALM3_hull_centroid <- data.frame(PC3=ALM3_hull_centroid[1],PC2=ALM3_hull_centroid[2])
-
-#ggplot(data = subset(levallois_proj, SpCode != 2), aes(x = PC3, y = PC2)) +
-#  stat_density_2d(aes(fill=Sp, alpha=stat(level)),
-#                  geom="polygon") +
-#  geom_polygon(data=subset(levallois_proj,Site=="JKF-1")[JKF1_hull_index,c("PC3","PC2")],
-#               aes(x = PC3, y = PC2),
-#               fill=NA,
-#               colour="black") +
-#  geom_point(data=JKF1_hull_centroid,
-#             aes(x = PC3, y = PC2),
-#             shape=21,
-#             colour="black") +
-#  geom_polygon(data=subset(levallois_proj,Site=="ALM-3")[ALM3_hull_index,c("PC2","PC3")],
-#               aes(x = PC3, y = PC2),
-#               fill=NA,
-#               colour="blue") +
-#  geom_point(data=ALM3_hull_centroid,
-#             aes(x = PC3, y = PC2),
-#             shape=21,
-#             colour="blue") +
-#  scale_fill_manual(values=c("#F8766D", "#00BA38")) +
-#  scale_color_manual(values=c("#F8766D", "#00BA38")) +
-#  scale_x_continuous(breaks=c(-5:10)) +
-#  scale_y_continuous(breaks=c(-4:3)) +
-#  labs(title="PCA Scores") +
-#  theme_minimal() +
-#  theme(text = element_text(family="Times", size=12),
-#        plot.title = element_text(face="bold",hjust=0.5,size=15),
-#        legend.position = "top")
-#
-#ggsave(filename="./Images/pca_23_JKF1_ALM3.pdf",
-#       device = "pdf")
 
 #####Generating variables for analysis####
 library(pastclim)
-
-##extracting pastclim data##
 
 train <- levallois_proj_train
 full <- levallois_proj
@@ -484,7 +523,7 @@ names(caf) <- c("E", "N")
 points_proj <- extent(round(min(caf$E)-200000), round(max(caf$E)+200000), round(min(caf$N)-200000), round(max(caf$N)+200000))
 points <- extent(round(min(train_sites$E)-2), round(max(train_sites$E)+2), round(min(train_sites$N)-2), round(max(train_sites$N)+2))
 
-srtm <- terra::rast("C:/Users/jblink/OneDrive - The University of Liverpool/CB MSA_LSA/SRTM_1km.tif")
+srtm <- terra::rast("SRTM_1km.tif") #you need to download the SRTM (e.g. from: https://www.pacioos.hawaii.edu/metadata/world_srtm30plus_dem1km_hillshade.html)
 srtm_2 <- crop(srtm, points)
 this_crs <- "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs "
 srtm_3 <- srtm_2 %>% terra::project(this_crs)
@@ -492,13 +531,13 @@ srtm_3 <- raster(srtm_3)
 
 library(gdistance)
 altDiff <- function(x){x[2] - x[1]}
-hd <- transition(srtm_3, altDiff, 8, symm=FALSE) #nb based on queen movement; nb gives negative values
+hd <- transition(srtm_3, altDiff, 8, symm=FALSE) #nb based on queen movement;
 slope <- geoCorrection(hd)
 adj <- adjacent(srtm_3, cells=1:ncell(srtm_3), pairs=TRUE, directions=8) #nb based on queen movement
 speed <- slope
 speed[adj] <- 6 * exp(-3.5 * abs(slope[adj] + 0.05)) # based on speed of movement from toblers function
 Conductance <- geoCorrection(speed)
-xc <- costDistance(Conductance, msalsa) # values are seconds (?) using toblers function for m/s
+xc <- costDistance(Conductance, msalsa) # values are seconds using toblers function for m/s
 costpath_dist <- as.dist(xc)
 
 ####permutations of age-dependent variables####
@@ -519,6 +558,11 @@ scale_fun <- function(x){(x-min(x))/(max(x)-min(x))} #scales to 0:1
 PC_list <- list(PC1_dist, PC2_dist, PC3_dist, PC4_dist)
 
 start_date <- Sys.Date()
+
+dir.create("PC1", showWarnings = FALSE)
+dir.create("PC2", showWarnings = FALSE)
+dir.create("PC3", showWarnings = FALSE)
+dir.create("PC4", showWarnings = FALSE)
 
 single_k_list <- list()
 multiple_k_list <- list()
@@ -574,9 +618,30 @@ for(k in c(1:1000)){
   
   sheet_names <- c("PC1", "PC2", "PC3", "PC4")
   
-  for(i in 1:length(simple_mantel_list)){xlsx::write.xlsx(simple_mantel_list[[i]], paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/Simple Mantel Tests_", start_date, "_", k, ".xlsx"), sheetName = sheet_names[i], append = T)}
-  for(i in 1:length(multi_mantel_list)){xlsx::write.xlsx(multi_mantel_list[[i]], paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/Multiple Mantel Tests_", start_date, "_",k, ".xlsx"), sheetName = sheet_names[i], append = T)}
+  for(i in 1:length(simple_mantel_list)){xlsx::write.xlsx(simple_mantel_list[[i]], paste0("Simple Mantel Tests_", start_date, "_", k, ".xlsx"), sheetName = sheet_names[i], append = T)}
+  for(i in 1:length(multi_mantel_list)){xlsx::write.xlsx(multi_mantel_list[[i]], paste0("Multiple Mantel Tests_", start_date, "_",k, ".xlsx"), sheetName = sheet_names[i], append = T)}
   
+  sheet_names <- c("PC1", "PC2", "PC3", "PC4")
+  
+  for(i in 1:4){
+    
+    ## SIMPLE MANTEL RESULTS
+    simple_df <- as.data.frame(single_k_list[[k]][[i]])
+    simple_df$Distance <- rownames(simple_df)
+    simple_df <- simple_df[, c("Distance", colnames(simple_df)[1:3])]
+    
+    write.csv(simple_df,
+              file = paste0(sheet_names[i], "/", sheet_names[i], "_Simple", k, ".csv"),
+              row.names = FALSE)
+    
+        ## MULTIPLE MANTEL RESULTS
+    multi_vec <- multiple_k_list[[k]][[i]]   # printed text
+    multi_df <- data.frame(Output = multi_vec)
+    
+    write.csv(multi_df,
+              file = paste0(sheet_names[i], "/", sheet_names[i], "_Multiple", k, ".csv"),
+              row.names = FALSE)
+  }
   print(k)
 }
 
@@ -606,7 +671,7 @@ site_level_list[[k]] <- site_level
 
 PC_list2 <- lapply(PC_list, function(x) scale_fun(x))
 
-setwd("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/distance matrices/indexed")
+setwd("/indexed")
 
 #export each stable distance matrix
 
@@ -638,35 +703,35 @@ for(k in 1:1000){
 #create output files#
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC1_Simple", i, ".csv")
+  file_name <- paste0("/indexed/PC1_Simple", i, ".csv")
   file.create(file_name)}
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC1_Multiple", i, ".csv")
+  file_name <- paste0("/indexed/PC1_Multiple", i, ".csv")
   file.create(file_name)}
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblink/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC2_Simple", i, ".csv")
+  file_name <- paste0("/indexed/PC2_Simple", i, ".csv")
   file.create(file_name)}
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblink/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC2_Multiple", i, ".csv")
+  file_name <- paste0("/indexed/PC2_Multiple", i, ".csv")
   file.create(file_name)}
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC3_Simple", i, ".csv")
+  file_name <- paste0("/indexed/PC3_Simple", i, ".csv")
   file.create(file_name)}
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC3_Multiple", i, ".csv")
+  file_name <- paste0("/indexed/PC3_Multiple", i, ".csv")
   file.create(file_name)}
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC4_Simple", i, ".csv")
+  file_name <- paste0("/indexed/PC4_Simple", i, ".csv")
   file.create(file_name)}
 
 for (i in 0:999) {
-  file_name <- paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/distance matrices/indexed/PC4_Multiple", i, ".csv")
+  file_name <- paste0("/indexed/PC4_Multiple", i, ".csv")
   file.create(file_name)}
 
 #UPLOAD DATA TO DISTRIBUTED COMPUTING SYSTEM#
@@ -699,252 +764,6 @@ names(multi1$coefficients) <- c("intercept", names(all_dists_sig))
 write.csv(t(mantelresults2), "Simple_PC1.csv")#edit for each PC
 write.csv(capture.output(multi1), "Multi_PC1.csv")#edit for each PC
 
-#####Figure if run on for loop with XLSX outputs; need to edit locations etc####
-
-library(readxl)
-#d <- read_excel("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/MM/Multiple Mantel Tests_2025-02-12_1.xlsx")
-
-library(ggplot2)
-library(dplyr)
-library(cowplot)
-
-# Sample data preparation
-patterns <- c("age", "altitude", "bio01", "bio04", "bio12", "bio15", "costpath", "count", "prop", "rawmat", "rugosity", "species", "type")
-all_ids <- c(patterns, "R-Squared")
-plots <- list()
-plot_titles <- c("Box Plot of Model Estimates for each variable and R-Squared values for PC1",
-                 "Box Plot of Model Estimates for each variable and R-Squared values for PC2",
-                 "Box Plot of Model Estimates for each variable and R-Squared values for PC3",
-                 "Box Plot of Model Estimates for each variable and R-Squared values for PC4")
-
-
-plot_titles <- c("PC1", "PC2", "PC3", "PC4")
-
-total_runs <- 500
-
-
-data_combo_list <- list()
-model_combo_list <- list()
-
-for(j in 1:4) {
-#  j <- 2
-  data_combo <- data.frame()
-  model_combo <- data.frame()
-# j <- 2
-  for(k in 1:100) {
-    #k <- 1
-    #a <- as.data.frame(multiple_k_list[[k]][[j]]) #from completed analysis
-    d <- read_excel(paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/MM2/Multiple Mantel Tests_2025-03-12_", k, ".xlsx"), sheet=paste0("PC", j)) #from saved excel
-    a <- data.frame(d[[2]]) #from saved excel
-    colnames(a) <- "data"
-    
-    filtered_data <- data.frame()
-    for (pattern in patterns) {
-      matches <- a[grepl(pattern, a$data, ignore.case = TRUE), ]
-      filtered_data <- rbind(filtered_data, matches)
-    }
-    filtered_data$data <- as.character(filtered_data[[1]])
-    
-    data_string <- paste(filtered_data$data, collapse = "\n")
-    split_data <- read.table(text = data_string, fill = TRUE, header = FALSE, stringsAsFactors = FALSE)
-    split_data_df <- data.frame(split_data, stringsAsFactors = FALSE)
-    split_data_df <- split_data_df[,1:4]
-    split_data_df$Model <- k
-    colnames(split_data_df) <- c("ID", "Value1", "Value2", "Significance", "Model")
-    
-    data_combo <- rbind(data_combo, split_data_df)
-    data_combo <- na.omit(data_combo)
-    
-    
-    stats <- c("R-squared", "F-statistic")
-    filtered_data2 <- data.frame()
-    for (pattern in stats) {
-      matches <- a[grepl(pattern, a$data, ignore.case = TRUE), ]
-      filtered_data2 <- rbind(filtered_data2, matches)
-    }
-    filtered_data2$data <- as.character(filtered_data2[[1]])
-    
-    # Corrected regular expression extraction
-    model_stats <- c(k, as.numeric(unlist(regmatches(filtered_data2[[1]], gregexpr("[[:digit:]]+\\.?[[:digit:]]*", filtered_data2[[1]])))))
-    model_combo <- rbind(model_combo, model_stats)
-  }
-  
-  for(k in 101:300) {
-    #k <- 1
-    #a <- as.data.frame(multiple_k_list[[k]][[j]]) #from completed analysis
-    d <- read_excel(paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/MM2/Multiple Mantel Tests_2025-05-06_", k, ".xlsx"), sheet=paste0("PC", j)) #from saved excel
-    a <- data.frame(d[[2]]) #from saved excel
-    colnames(a) <- "data"
-    
-    filtered_data <- data.frame()
-    for (pattern in patterns) {
-      matches <- a[grepl(pattern, a$data, ignore.case = TRUE), ]
-      filtered_data <- rbind(filtered_data, matches)
-    }
-    filtered_data$data <- as.character(filtered_data[[1]])
-    
-    data_string <- paste(filtered_data$data, collapse = "\n")
-    split_data <- read.table(text = data_string, fill = TRUE, header = FALSE, stringsAsFactors = FALSE)
-    split_data_df <- data.frame(split_data, stringsAsFactors = FALSE)
-    split_data_df <- split_data_df[,1:4]
-    split_data_df$Model <- k
-    colnames(split_data_df) <- c("ID", "Value1", "Value2", "Significance", "Model")
-    
-    data_combo <- rbind(data_combo, split_data_df)
-    data_combo <- na.omit(data_combo)
-    
-    
-    stats <- c("R-squared", "F-statistic")
-    filtered_data2 <- data.frame()
-    for (pattern in stats) {
-      matches <- a[grepl(pattern, a$data, ignore.case = TRUE), ]
-      filtered_data2 <- rbind(filtered_data2, matches)
-    }
-    filtered_data2$data <- as.character(filtered_data2[[1]])
-    
-    # Corrected regular expression extraction
-    model_stats <- c(k, as.numeric(unlist(regmatches(filtered_data2[[1]], gregexpr("[[:digit:]]+\\.?[[:digit:]]*", filtered_data2[[1]])))))
-    model_combo <- rbind(model_combo, model_stats)
-  }
-  
-  for(k in 301:500) {
-    #k <- 1
-    #a <- as.data.frame(multiple_k_list[[k]][[j]]) #from completed analysis
-    d <- read_excel(paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/MM2/Multiple Mantel Tests_2025-05-08_", k, ".xlsx"), sheet=paste0("PC", j)) #from saved excel
-    a <- data.frame(d[[2]]) #from saved excel
-    colnames(a) <- "data"
-    
-    filtered_data <- data.frame()
-    for (pattern in patterns) {
-      matches <- a[grepl(pattern, a$data, ignore.case = TRUE), ]
-      filtered_data <- rbind(filtered_data, matches)
-    }
-    filtered_data$data <- as.character(filtered_data[[1]])
-    
-    data_string <- paste(filtered_data$data, collapse = "\n")
-    split_data <- read.table(text = data_string, fill = TRUE, header = FALSE, stringsAsFactors = FALSE)
-    split_data_df <- data.frame(split_data, stringsAsFactors = FALSE)
-    split_data_df <- split_data_df[,1:4]
-    split_data_df$Model <- k
-    colnames(split_data_df) <- c("ID", "Value1", "Value2", "Significance", "Model")
-    
-    data_combo <- rbind(data_combo, split_data_df)
-    data_combo <- na.omit(data_combo)
-    
-    
-    stats <- c("R-squared", "F-statistic")
-    filtered_data2 <- data.frame()
-    for (pattern in stats) {
-      matches <- a[grepl(pattern, a$data, ignore.case = TRUE), ]
-      filtered_data2 <- rbind(filtered_data2, matches)
-    }
-    filtered_data2$data <- as.character(filtered_data2[[1]])
-    
-    # Corrected regular expression extraction
-    model_stats <- c(k, as.numeric(unlist(regmatches(filtered_data2[[1]], gregexpr("[[:digit:]]+\\.?[[:digit:]]*", filtered_data2[[1]])))))
-    model_combo <- rbind(model_combo, model_stats)
-  }
-  
-  names(model_combo) <- c("Model", "R_Squared", "F_Statistic", "Permutations", "Significance")
-  
-  data_combo_list[[j]] <- data_combo
-  model_combo_list[[j]] <- model_combo
-}  
-  
-for(j in 1:4) {  
-  
-  #j <- 1
-  
-  data_combo <- data_combo_list[[j]]
-  model_combo <- model_combo_list[[j]]
-  
-  df <- data_combo
-  df$Value1 <- as.numeric(df$Value1)
-  
-  significant_models <- model_combo$Model[model_combo$Significance < 0.05]
-  model_combo_subset <- model_combo[model_combo$Model %in% significant_models, ]
-  df_subset <- df[df$Model %in% significant_models, ]
-  
-  excluded <- vector()
-  # Ensure all variables are present
-  for (id in all_ids) {
-    if (!id %in% df_subset$ID) {
-      excluded <- c(excluded,id)
-      df_subset <- rbind(df_subset, data.frame(ID = id, Value1 = NA, Value2 = NA, Significance = NA, Model = NA))
-    }
-  }
-  
-  # Calculate the total counts and significant counts
-  total_counts <- table(df_subset$ID)
-  total_counts2 <- as.vector(total_counts)
-  names(total_counts2) <- names(total_counts)
-  
-  total_counts2 <- total_counts2[names(total_counts2)!="R-Squared"]
-  total_counts2
-  
-  significant_counts <- table(df_subset$ID[df_subset$Significance < 0.05])
-  significant_counts
-  
-  # Create a vector of zero counts for IDs with no significant results
-  significant_counts_full <- rep(0, length(all_ids))
-  names(significant_counts_full) <- all_ids
-  significant_counts_full[names(significant_counts)] <- significant_counts
-  
-  significant_counts_full <-  significant_counts_full[names( significant_counts_full)!="R-Squared"]
-  significant_counts_full
-  
-  
-  # Calculate the percentages
-  percentages <- significant_counts_full / total_runs * 100
-  percentages
-  # Create labels with total counts and percentages on separate lines
-  #labels <- c(paste(patterns, "\n(n=", total_counts[patterns], " / ", round(percentages[patterns], 2), "%)", sep = ""), "R-Squared")
-labels <- vector()
-  
-  # Loop through the patterns
-  for (item in patterns) {
-    if (item %in% excluded) {
-      labels <- c(labels, item)
-    } else {
-      labels <- c(labels, paste(item, "\n(n=", total_counts2[item], " / ", round(percentages[item], 2), "%)", sep = ""))
-    }
-  }
-  
-  # Add "R-Squared" to labels
-  labels <- c(labels, "R-Squared")
-  
-  labels
-  
-  # Store the generated plots
-  plots[[j]] <- ggplot() +
-    # First boxplot from df_subset
-    geom_boxplot(data = df_subset, aes(x = factor(ID, levels = all_ids), y = Value1, group = ID), fill = "grey", alpha = 0.5) +
-    geom_jitter(data = df_subset, aes(x = factor(ID, levels = all_ids), y = Value1, color = Significance < 0.05), width = 0.2) +
-    # Second boxplot from model_combo_subset
-    geom_boxplot(data = model_combo_subset, aes(x = factor("R-Squared", levels = all_ids), y = as.numeric(R_Squared)), fill = "lightblue", alpha = 0.5) +
-    labs(title = plot_titles[j],
-         #x = "Variable (count of models in which the variable is present / proportion of models where variable is present that it is significant)",
-         x = "",
-         y = "R-squared / Model Estimate") +
-    scale_x_discrete(labels = c(labels, "R-Squared")) +
-    scale_color_manual(name = "Significance < 0.05", values = c("TRUE" = "red", "FALSE" = "blue")) +
-    theme_minimal() +
-    theme(
-      axis.text.y = element_text(size = 10, angle = 0, hjust = 1),
-      axis.title.y = element_text(size = 10, face = "italic", hjust = 0.5)
-    )
-}
-
-# Combine all plots into a single figure
-combined_plot <- plot_grid(plotlist = plots, ncol = 1, align = "v")
-
-# Print the combined plot
-print(combined_plot)
-
-
-
-
-
 
 ####Simple Mantel: Figure 6 from individual csvs####
 
@@ -958,19 +777,19 @@ library(cowplot)
 
 #this is only necessary if you're running an unequal number of analyses - e.g. hold problems taking ages on HTCondor
 file_numbers <- list()
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC1", 
+files <- list.files("PC1", 
                     pattern = "^PC1_Simple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[1]] <- as.numeric(gsub("^(PC1_Simple)(\\d+)\\.csv$", "\\2", basename(files)))
 
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC2", 
+files <- list.files("PC2", 
                     pattern = "^PC2_Simple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[2]] <- as.numeric(gsub("^(PC2_Simple)(\\d+)\\.csv$", "\\2", basename(files)))
 
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC3", 
+files <- list.files("PC3", 
                     pattern = "^PC3_Simple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[3]] <- as.numeric(gsub("^(PC3_Simple)(\\d+)\\.csv$", "\\2", basename(files)))
 
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC4", 
+files <- list.files("PC4", 
                     pattern = "^PC4_Simple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[4]] <- as.numeric(gsub("^(PC4_Simple)(\\d+)\\.csv$", "\\2", basename(files)))
 
@@ -981,7 +800,7 @@ for(j in 1:4) {
   i1 <- file_numbers[[j]]
   i2 <- order(i1)
   for(k in file_numbers[[j]]) {
-    df_list[[i2[[which(i1==k)]]]] <- read.csv(paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC",j,"/PC",j,"_Simple",k,".csv"))
+    df_list[[i2[[which(i1==k)]]]] <- read.csv(paste0("PC",j,"/PC",j,"_Simple",k,".csv"))
 
     }
     big_df_list[[j]] <- df_list}
@@ -1016,11 +835,11 @@ for(j in 1:4){
 
 combined <- cbind(mantel_means[[1]][1], do.call(cbind, lapply(mantel_means, function(df) df[-1])))
 colnames(combined) <- c("Variable", "PC1", "PC2", "PC3", "PC4")
-write.csv(combined, "C:/Users/jblin/OneDrive - The University of Liverpool/NITD/Table6.csv")
+write.csv(combined, "Table6.csv")
 
 combined2 <- cbind(r2_means[[1]][1], do.call(cbind, lapply(r2_means, function(df) df[-1])))
 colnames(combined2) <- c("Variable", "PC1", "PC2", "PC3", "PC4")
-write.csv(combined2, "C:/Users/jblin/OneDrive - The University of Liverpool/NITD/Table6b.csv")
+write.csv(combined2, "Table6b.csv")
 
 library(ggplot2)
 library(dplyr)
@@ -1077,7 +896,7 @@ simple_mantel <- ggplot(combined_df, aes(x = X, y = pvalue, color = color_catego
   guides(color = guide_legend(title = NULL)) +  # Remove legend title
   facet_wrap(~ PC, ncol = 1)
 
-ggsave("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/simple_mantel.pdf", plot = simple_mantel, width = 8.27, height = 11.69, units = "in")
+ggsave("Figure 6.pdf", plot = simple_mantel, width = 8.27, height = 11.69, units = "in")
 
 ####Multiple Matrix Regression: Figure 7 from individual csvs####
 
@@ -1103,19 +922,19 @@ model_combo_list <- list()
 
 #this is only necessary if you're running an unequal number of analyses - e.g. hold problems taking ages on HTCondor
 file_numbers <- list()
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC1", 
+files <- list.files("PC1", 
                     pattern = "^PC1_Multiple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[1]] <- as.numeric(gsub("^(PC1_Multiple)(\\d+)\\.csv$", "\\2", basename(files)))
 
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC2", 
+files <- list.files("PC2", 
                     pattern = "^PC2_Multiple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[2]] <- as.numeric(gsub("^(PC2_Multiple)(\\d+)\\.csv$", "\\2", basename(files)))
 
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC3", 
+files <- list.files("PC3", 
                     pattern = "^PC3_Multiple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[3]] <- as.numeric(gsub("^(PC3_Multiple)(\\d+)\\.csv$", "\\2", basename(files)))
 
-files <- list.files("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC4", 
+files <- list.files("PC4", 
                     pattern = "^PC4_Multiple[0-9]+\\.csv$", full.names = TRUE)
 file_numbers[[4]] <- as.numeric(gsub("^(PC4_Multiple)(\\d+)\\.csv$", "\\2", basename(files)))
 
@@ -1124,7 +943,7 @@ for(j in 1:4) {
   model_combo <- data.frame()
 
   for(k in file_numbers[[j]]) {
-    d <- read.csv(paste0("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC",j,"/PC",j,"_Multiple",k,".csv"))
+    d <- read.csv(paste0("PC",j,"/PC",j,"_Multiple",k,".csv"))
     a <- data.frame(d[[2]]) #from saved excel
     colnames(a) <- "data"
     
@@ -1174,7 +993,7 @@ summary_table <- do.call(rbind, lapply(seq_along(model_combo_list), function(i) 
   )
 }))
 
-write.csv(summary_table, "C:/Users/jblin/OneDrive - The University of Liverpool/NITD/MMR_Summary_table.csv")
+write.csv(summary_table, "MMR_Summary_table.csv")
 
 table8 <- list()
 table9 <- list()
@@ -1208,7 +1027,7 @@ wide_table <- final_table %>%
     names_sep = "_"
   )
 
-write.csv(wide_table, "C:/Users/jblin/OneDrive - The University of Liverpool/NITD/MMR_Summary_data_table.csv")
+write.csv(wide_table, "MMR_Summary_data_table.csv")
 
 for(j in 1:4) {
   data_combo <- data_combo_list[[j]]
@@ -1252,15 +1071,6 @@ for(j in 1:4) {
   table8[[j]] <- significant_counts_full
   table9[[j]] <- total_counts2
   
-  # Loop through the patterns
-  #for (item in patterns) {
-  #  if (item %in% excluded) {
-  #    labels <- c(labels, item)
-  #  } else {
-  #    labels <- c(labels, paste(item, "\n(n=", total_counts2[item], " / ", round(percentages[item], 2), "%)", sep = ""))
-  #  }
-  #}
-  
   #labels <- c(labels, "R-Squared")
   labels <- c("Age","Altitude", "Bio01","Bio04","Bio12","Bio15","Costpath","Count", "P.I.","Rawmat","Rugosity","Species","Type", "R-squared")
   # Store the generated plots
@@ -1289,7 +1099,7 @@ combined_plot <- plot_grid(plotlist = plots, ncol = 1, align = "v")
 # Print the combined plot
 print(combined_plot)
 
-ggsave("C:/Users/jblin/OneDrive - The University of Liverpool/NITD/multi_mantel.pdf", plot = combined_plot, width = 11.69, height = 8.79, units = "in")
+ggsave("Figure 7.pdf", plot = combined_plot, width = 11.69, height = 8.79, units = "in")
 
 dfx <- data.frame(table8)
 names(dfx) <- plot_titles
@@ -1297,7 +1107,7 @@ names(dfx) <- plot_titles
 dfy <- data.frame(table9)
 names(dfy) <- plot_titles
 
-write.csv(cbind(dfx, dfy), "C:/Users/jblin/OneDrive - The University of Liverpool/NITD/proptab.csv")
+write.csv(cbind(dfx, dfy), "proptab.csv")
 
 ####PC1-4 SpCode Logistic regressions####
 
@@ -1367,7 +1177,7 @@ PC1_4_curve <- ggplot(data = rocr_cv_perf,
 
 PC1_4_curve
 
-ggsave(filename="C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC1-4logit_cv_roc.pdf",
+ggsave(filename="PC1-4logit_cv_roc.pdf",
        device = "pdf")
 
 ##
@@ -1389,7 +1199,7 @@ PC1_4_hist <- ggplot(data = data.frame(AUC=rocr_cv_perf_auc$auc),
 
 
 PC1_4_hist
-ggsave(filename="C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC1-4auc_distribution.pdf",
+ggsave(filename="PC1-4auc_distribution.pdf",
        device = "pdf")
 
 
@@ -1454,7 +1264,7 @@ PC2_3_curve <- ggplot(data = rocr_cv_perf,
         plot.title = element_text(face="bold",hjust=0.5,size=15))
 
 PC2_3_curve
-ggsave(filename="C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC2-3logit_cv_roc.pdf",
+ggsave(filename="PC2-3logit_cv_roc.pdf",
        device = "pdf")
 
 
@@ -1476,7 +1286,7 @@ PC2_3_hist <- ggplot(data = data.frame(AUC=rocr_cv_perf_auc$auc),
 
 PC2_3_hist
 
-ggsave(filename="C:/Users/jblin/OneDrive - The University of Liverpool/NITD/PC2-3auc_distribution.pdf",
+ggsave(filename="PC2-3auc_distribution.pdf",
        device = "pdf")
 
 
@@ -1511,13 +1321,15 @@ row.names(logit_df) <- c("JKF-1 (PC1-4)",
                          "ALM-3 (PC1-4)",
                          "ALM-3 (PC2-3)")
 
-write.csv(logit_df, "C:/Users/jblin/OneDrive - The University of Liverpool/NITD/logit_df.csv")
+write.csv(logit_df, "logit_df.csv")
 
 
 plot(logit_predict_JKF1_PC2_3$fit)
 
 sort(logit_predict_JKF1_PC2_3$fit)
 sort(logit_predict_ALM3_PC2_3$fit)
+
+####Figure 9####
 
 library(patchwork)
 
